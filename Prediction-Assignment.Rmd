@@ -1,1 +1,131 @@
+---
+title: "Prediction-Assignment"
+author: "Deborah Passey"
+date: "7/28/2019"
+output: html_document
+---  
+
+INTRODUCTION  
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a  large amount of data about personal activity relatively inexpensively. These type of devices  are part of the quantified self movement – a group of enthusiasts who take measurements about  themselves regularly to improve their health, to find patterns in their behavior, or because  they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.   
+
+The data set for this analysis is from:  
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.   
+
+
+```{r setup, include=FALSE}
+    
+    library(knitr)    
+    library(caret)
+    library(csv)
+    library(kableExtra)
+    library(dplyr)
+    library(tidyr)
+```  
+  
+    
+METHODS  
+
+This project uses data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. This data is used to predict whether participants did the exercise correctly or incorrectly.   
+
+This project uses two datsets: a training dataset with 19,622 observations of 53 variables, and a testing dataset of 20 observations of 53 variables. The data sets were cleaned up to removed variables that most of the observations missing.   
+
+```{r data, message=FALSE, tidy=TRUE}
+    setwd("C:/Users/Deborah Passey/Desktop")
+    
+    pml_training <- read.csv("pml-training.csv", na.strings = c("","NA","#DIV/0!"))        
+    pml_testing <- read.csv("pml-testing.csv", na.strings = c("","NA","#DIV/0!"))  
+    
+    training <- pml_training[lapply(pml_training, function(x) sum(is.na(x)) / length(x) ) < 0.05]
+    testing <- pml_testing[lapply(pml_testing, function(x) sum(is.na(x)) / length(x)) < 0.05]
+
+    training_data <- training[,-c(1:7)]
+    testing_data <- testing[,-c(1:7)]  
+    
+    training_data$classe <- unclass(training_data$classe)
+    testing_data$classe <- unclass(testing_data$classe)
+    
+    inTrain <- createDataPartition(y=training_data$classe, p=0.7,list = FALSE)
+    train <- training_data[inTrain,] 
+    test <- training_data[-inTrain,]
+  
+```  
+
+Data Summary for Participants    
+
+In order to cut down on processing time and predictors, the dataset was trimmed down to a select number of variables. The research from Ugulino et al (2012) was used a selection algorithm to identify 16 variables that are potentially the best at predicting whether participants did the exercise correctly: (1) Sensor on the belt - acceleration, pitch, yaw, and roll, (2) Sensor on the arm - acceleration, pitch, yaw, and roll, (3) Sensor on the forearm - acceleration, pitch, yaw, and roll, and (4) Sensor on the dumbbell - accleraton, pitch, yaw, and roll.  
+The data table below shows the average for each of the six participants. The table reports the average of the Euler angles: roll, pitch and yaw, and accelerometer (accel) data for the arm, dumbbell, forearm, and belt.  
+
+
+```{r summary, warning=FALSE, error=FALSE, tidy=TRUE}  
+
+    means <- training[,c("user_name", "roll_belt","roll_arm", "roll_dumbbell", "roll_forearm", "pitch_belt", "pitch_arm", "pitch_dumbbell", "pitch_forearm", "yaw_belt", "yaw_arm", "yaw_dumbbell", "yaw_forearm","total_accel_arm", "total_accel_belt", "total_accel_dumbbell","total_accel_forearm")]
+    dataset <- means %>% group_by(user_name) %>% summarise_each(funs(mean))
+    summ <- kable(dataset) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>% scroll_box(width = "100%", height = "200px")
+    summ
+```  
+
+
+
+RESULTS  
+
+Three models were fit with the training data set: (1) gradient boosting model (GBM), (2) linear model, and (3) random forest. To increase repoducibility, the "set.seed(150)" function was used for each model. The GBM used a k-fold cross-validation, where the dataset is split into k-subsets. Each subset is held out while the model is trained on the other subsets. This process is completed to determine accuracy for each of the datasets, and an overall accuracy estimate is provided. The linear model and random forest models were fit with "classe" as the outcome and 16 variables as predictors. 
+  
+
+```{r models, warning=FALSE, error=FALSE}  
+ 
+## GBM Model
+  set.seed(200)
+  control <- trainControl(method = "cv", number = 5)
+  gbm_model <- train(classe ~ ., method = "gbm", data = train[,c("classe", "roll_belt","roll_arm", "roll_dumbbell", "roll_forearm", "pitch_belt", "pitch_arm", "pitch_dumbbell", "pitch_forearm", "yaw_belt", "yaw_arm", "yaw_dumbbell", "yaw_forearm","total_accel_arm", "total_accel_belt", "total_accel_dumbbell","total_accel_forearm")], trControl= control, verbose=FALSE)
+
+## Linear Model 
+  set.seed(200)
+  lm_model <‐ train(classe ~.,data = train[,c("classe", "roll_belt","roll_arm", "roll_dumbbell", "roll_forearm", "pitch_belt", "pitch_arm", "pitch_dumbbell", "pitch_forearm", "yaw_belt", "yaw_arm", "yaw_dumbbell", "yaw_forearm","total_accel_arm", "total_accel_belt", "total_accel_dumbbell","total_accel_forearm")],method="lm")
+ 
+## Random Forest
+  set.seed(200)
+  control <- trainControl(method = "repeatedcv", number = 5, repeats = 3)
+  rf_model <- train(classe ~ ., data = train[,c("classe", "roll_belt","roll_arm", "roll_dumbbell", "roll_forearm", "pitch_belt", "pitch_arm", "pitch_dumbbell", "pitch_forearm", "yaw_belt", "yaw_arm", "yaw_dumbbell", "yaw_forearm","total_accel_arm", "total_accel_belt", "total_accel_dumbbell","total_accel_forearm")], method = "rf", ntree = 10, trControl = control, verbose=FALSE)
+  
+```  
+
+```{r cross validation, tidy=TRUE}  
+  
+  trellis.par.set(caretTheme())
+  plot(gbm_model) 
+  
+  gbm_model$finalModel
+  gbm_predict <- predict(gbm_model, testing_data)
+  gbm_prediction <- chartr("12345", "ABCDE", round(gbm_predict, digits=0))
+  
+  lm_model$finalModel
+  lm_predict <‐ predict(lm_model,testing_data)
+  lm_prediction <- chartr("12345", "ABCDE", round(lm_predict, digits=0))
+
+  rf_model$finalModel
+  rf_predict <‐  predict(rf_model,testing_data)
+  rf_prediction <- chartr("12345", "ABCDE", round(rf_predict, digits=0))  
+  
+  ## Comparisons
+  conf.matrix <- round(prop.table(table(lm_prediction, gbm_prediction, rf_prediction), 3), 3)
+  conf.matrix
+                        
+
+```
+
+CONCLUSIONS  
+
+The predicted cases for all three models is found below. The random forest model performed well and was used to predict the 20 cases for the quiz. 
+
+```{r classe predictions}
+
+  prediction_results <- cbind(gbm_prediction, lm_prediction, rf_prediction)
+  kable(prediction_results) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  
+```
+
+
 
