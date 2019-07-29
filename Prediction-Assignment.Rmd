@@ -1,3 +1,6 @@
+
+VIEW THIS ON Rpubs: http://rpubs.com/debgwen/Prediction-Assignment
+
 ---
 title: "Prediction-Assignment"
 author: "Deborah Passey"
